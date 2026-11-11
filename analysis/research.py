@@ -5,7 +5,7 @@ import pandas as pd
 root = Path(__file__).resolve().parents[1]
 movies = pd.read_csv(root / 'data/movies.csv')
 ratings = pd.read_csv(root / 'data/ratings.csv')
-stats = ratings.groupby('movieId').rating.agg(n='size', mean='mean').reset_index()
+stats = ratings.groupby('movieId').rating.agg(n='size', mean='mean', sd=lambda x: x.std(ddof=0)).reset_index()
 mu = ratings.rating.mean()
 stats['weighted'] = (stats.n * stats['mean'] + 25 * mu) / (stats.n + 25)
 
@@ -19,3 +19,11 @@ print('minimum_n, eligible_movies, top12_overlap (m=25)')
 for n in [1, 2, 3, 5, 10, 20, 50, 100]:
     pool = stats[stats.n >= n]
     print(n, len(pool), len(top_ids(pool, 'mean') & top_ids(pool, 'weighted')), sep=', ')
+
+from itertools import combinations
+records = stats[stats.n >= 50].merge(movies, on='movieId').to_dict('records')
+pairs = ((a,b) for a,b in combinations(records,2) if abs(a['mean']-b['mean']) <= .01)
+a,b = max(pairs, key=lambda pair: abs(pair[0]['sd']-pair[1]['sd']))
+print('Illustrative pair: >=50 ratings each, mean difference <=0.01; largest SD difference')
+for film in [a,b]:
+    print({key:film[key] for key in ['movieId','title','n','mean','sd']})
