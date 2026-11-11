@@ -6,11 +6,23 @@
 
 直接访问部署站点，或在本地通过静态 HTTP 服务打开 `index.html`。页面会从 `data/movies.csv` 与 `data/ratings.csv` 自动读取 MovieLens Small 数据。可按类型、发行年代和最低评分人数筛选；切换榜单指标；点击散点或榜单行联动查看单片评分详情与评分分布。
 
+在线体验：<https://skyone-spec.github.io/-lab3/>。
+
+- 点击敏感性曲线的门槛节点，同步筛选散点、统计和榜单。
+- 调整平滑权重 m（0–100），比较小样本处理对排名的影响。
+- 开启散点框选，拖动矩形后只对局部电影计算统计和榜单；返回点选可查看电影详情。
+- 清除框选或恢复默认即可返回；门槛节点和榜单支持键盘 Enter/空格。
+- 图表库和 ZIP 解析库已随 `assets/` 发布，本地静态预览不再依赖 CDN。
+
+复现报告汇总：安装 `pandas` 和 `scipy` 后运行 `python analysis/research.py`。网页运行无需 Python。
+
 ## 文件
 
 - `index.html`：D3.js 交互式可视化
 - `data/`：MovieLens Small 官方数据 CSV 与许可说明
 - `研究报告.md`：研究问题、设计理由、数据发现、局限与开发过程
+- `analysis/research.py`：复现候选量、重合度与 Spearman 相关
+- `assets/`：D3 7.9.0、JSZip 3.10.1 及许可
 
 ## GitHub Pages 部署
 
