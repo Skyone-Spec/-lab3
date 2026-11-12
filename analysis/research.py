@@ -5,7 +5,7 @@ import pandas as pd
 root = Path(__file__).resolve().parents[1]
 movies = pd.read_csv(root / 'data/movies.csv')
 ratings = pd.read_csv(root / 'data/ratings.csv')
-stats = ratings.groupby('movieId').rating.agg(n='size', mean='mean', sd=lambda x: x.std(ddof=0)).reset_index()
+stats = ratings.groupby('movieId').rating.agg(n='size', mean='mean', sd=lambda x: x.std(ddof=0), low=lambda x:(x<=2).mean(), mid=lambda x:((x>=2.5)&(x<=3.5)).mean(), high=lambda x:(x>=4).mean()).reset_index()
 mu = ratings.rating.mean()
 stats['weighted'] = (stats.n * stats['mean'] + 25 * mu) / (stats.n + 25)
 
@@ -27,3 +27,15 @@ a,b = max(pairs, key=lambda pair: abs(pair[0]['sd']-pair[1]['sd']))
 print('Illustrative pair: >=50 ratings each, mean difference <=0.01; largest SD difference')
 for film in [a,b]:
     print({key:film[key] for key in ['movieId','title','n','mean','sd']})
+
+counterexamples=[]
+for a,b in combinations(records,2):
+    if abs(a['mean']-b['mean'])>.05+1e-12: continue
+    if a['low']<b['low']: a,b=b,a
+    low=a['low']-b['low'];mid=b['mid']-a['mid']
+    if low+1e-12>=.1 and mid+1e-12>=.1:
+        counterexamples.append((low+mid,a,b))
+counterexamples.sort(key=lambda pair:(-pair[0],abs(pair[1]['mean']-pair[2]['mean']),pair[1]['movieId'],pair[2]['movieId']))
+print('Counterexamples (n>=50; mean difference<=0.05; low/mid differences each>=10pp):',len(counterexamples))
+for _,a,b in counterexamples[:5]:
+    print([{key:d[key] for key in ['title','n','mean','low','mid','high']} for d in [a,b]])
