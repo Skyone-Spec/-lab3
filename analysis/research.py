@@ -39,3 +39,11 @@ counterexamples.sort(key=lambda pair:(-pair[0],abs(pair[1]['mean']-pair[2]['mean
 print('Counterexamples (n>=50; mean difference<=0.05; low/mid differences each>=10pp):',len(counterexamples))
 for _,a,b in counterexamples[:5]:
     print([{key:d[key] for key in ['title','n','mean','low','mid','high']} for d in [a,b]])
+
+# Baseline user-habit correction: lambda=0.5, no excluded records.
+user_n=ratings.groupby('userId').rating.transform('size')
+user_mean=ratings.groupby('userId').rating.transform('mean')
+adjusted=(ratings.rating-.5*user_n/(user_n+20)*(user_mean-mu)).clip(.5,5)
+calibration=pd.DataFrame({'movieId':ratings.movieId,'calibrated':adjusted}).groupby('movieId').calibrated.mean().reset_index().merge(stats[['movieId','mean','n']],on='movieId').merge(movies,on='movieId')
+print('User-habit model lambda=0.5 (hypothetical correction, not true quality):')
+print(calibration[calibration.movieId.isin([924,7143,318])][['title','n','mean','calibrated']].to_string(index=False))
