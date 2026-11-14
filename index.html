@@ -294,7 +294,7 @@ function renderRaters(){
  drawExclusionEffect();
  const rows=(filmRecords.get(dialogMovie)||[]).slice().sort((a,b)=>a.userId-b.userId);
  $('raterList').innerHTML=rows.map(r=>{const u=userProfiles.get(r.userId);return `<button class="rater" data-user="${u.id}" aria-pressed="${profileUser===u.id}"><b>匿名用户 #${u.id}</b><small>本片 ${r.rate} 星 · ${excludedRatings.has(r.index)?'已屏蔽':'参与校正'}<br>历史 ${u.rows.length} 条，均分 ${u.mean.toFixed(2)}</small></button>`;}).join('');
- $('raterList').querySelectorAll('[data-user]').forEach(b=>b.onclick=()=>{profileUser=+b.dataset.user;renderRaters();});renderUserProfile();
+ $('raterList').querySelectorAll('[data-user]').forEach(b=>b.onclick=()=>{profileUser=+b.dataset.user;lastExcludedFilm=null;renderRaters();});renderUserProfile();
 }
 function drawExclusionEffect(){
  const movie=movieLookup.get(lastExcludedFilm??dialogMovie);
@@ -302,7 +302,8 @@ function drawExclusionEffect(){
  const records=filmRecords.get(movie.id),before=d3.mean(records,r=>adjustedRecord(r)),after=movie.calibrated;
  const excluded=movie.n-movie.calibratedN;
  const panel=$('exclusionEffect');
- panel.innerHTML=`<h3>屏蔽前后 · ${escapeHTML(movie.title)}</h3><p class="note">本片屏蔽 ${excluded} / ${movie.n} 条评分。${movie.id!==dialogMovie?'你刚刚操作了另一部电影的评分，下面展示该片的变化。':''}</p><div id="exclusionBars"></div><p><strong>${after===null?'已无参与评分':('校正均分变化 '+d3.format('+.4f')(after-before)+' 星')}</strong></p><p class="micro">两行使用相同的校准力度 λ=${calibrationStrength()}，比较保留全部评分和当前屏蔽后的结果。点击评分格即时生效，关闭窗口可查看联动榜单。</p>`;
+ panel.innerHTML=`<h3>屏蔽前后 · ${escapeHTML(movie.title)}</h3><p class="note">本片屏蔽 ${excluded} / ${movie.n} 条评分。${movie.id!==dialogMovie?'你刚刚操作了另一部电影的评分，下面展示该片的变化。':''}</p><div id="exclusionBars"></div><div id="ratingEvidence"></div><p><strong>${after===null?'已无参与评分':('校正均分变化 '+d3.format('+.4f')(after-before)+' 星')}</strong></p><p class="micro">两行使用相同的校准力度 λ=${calibrationStrength()}，比较保留全部评分和当前屏蔽后的结果。点击评分格即时生效，关闭窗口可查看联动榜单。</p>`;
+ drawRatingEvidence(movie);
  const x=d3.scaleLinear().domain([0,5]).range([130,490]);
  const svg=d3.select('#exclusionBars').append('svg').attr('viewBox','0 0 600 100').attr('role','img').attr('aria-label','校正均分屏蔽前后对比');
  [['屏蔽前',before],['屏蔽后',after]].forEach(([label,value],i)=>{
@@ -314,6 +315,29 @@ function drawExclusionEffect(){
  });
  svg.append('text').attr('x',130).attr('y',94).attr('font-size',11).text('0');
  svg.append('text').attr('x',465).attr('y',94).attr('font-size',11).text('5 星');
+}
+function drawRatingEvidence(movie){
+ const user=userProfiles.get(profileUser);
+ const record=user?.rows.find(r=>r.movieId===movie.id);
+ if(!record)return;
+ const history=user.rows.filter(r=>r.movieId!==movie.id);
+ const peers=filmRecords.get(movie.id).filter(r=>r.userId!==user.id);
+ const personalMean=d3.mean(history,r=>r.rate),peerMean=d3.mean(peers,r=>r.rate);
+ const signed=d3.format('+.2f');
+ const description=(mean,n)=>n?`均分 ${mean.toFixed(2)} 星，与本次相差 ${signed(record.rate-mean)} 星`:'参考记录不足';
+ const panel=$('ratingEvidence');
+ panel.innerHTML=`<h3>这条评分的屏蔽依据</h3><p class="note">匿名用户 #${user.id} 给这部电影 ${record.rate} 星，当前${excludedRatings.has(record.index)?'已屏蔽':'参与计算'}。</p><div id="evidenceChart"></div><p class="micro">该用户其他电影共 ${history.length} 条，${description(personalMean,history.length)}。本片其他观众共 ${peers.length} 条，${description(peerMean,peers.length)}。</p><p class="note">${history.length?`该用户其他评分中，有 ${(history.filter(r=>r.rate<=record.rate).length/history.length*100).toFixed(1)}% 小于或等于本次评分。`:''}两组参考均使用完整原始数据，排除本次评分后计算。偏离均值可以帮助发现值得检查的记录，合理性仍需结合具体观影理由判断；本数据仅记录星级。</p>`;
+ const x=d3.scaleLinear().domain([0,5]).range([135,480]);
+ const svg=d3.select('#evidenceChart').append('svg').attr('viewBox','0 0 600 130').attr('role','img').attr('aria-label','本次评分、该用户其他评分均分与其他观众均分');
+ [['本次评分',record.rate],['他平时的均分',personalMean],['其他观众均分',peerMean]].forEach(([label,value],i)=>{
+   const y=15+i*32;
+   svg.append('text').attr('x',0).attr('y',y+13).attr('font-size',13).text(label);
+   svg.append('line').attr('x1',135).attr('x2',480).attr('y1',y+8).attr('y2',y+8).attr('stroke','#c4cfc6');
+   if(value!==undefined)svg.append('circle').attr('cx',x(value)).attr('cy',y+8).attr('r',5).attr('fill',i?'#26766e':'#b96936');
+   svg.append('text').attr('x',500).attr('y',y+13).attr('font-size',13).text(value===undefined?'数据不足':value.toFixed(2));
+ });
+ svg.append('text').attr('x',135).attr('y',122).attr('font-size',11).text('0');
+ svg.append('text').attr('x',460).attr('y',122).attr('font-size',11).text('5 星');
 }
 function renderUserProfile(){
  const u=userProfiles.get(profileUser);if(!u){$('userProfile').innerHTML='<p>没有可用用户记录。</p>';return;}
